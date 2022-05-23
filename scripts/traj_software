@@ -1,0 +1,219 @@
+#!/usr/bin/env python
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+Trajectory planning script: -Published topics: /trajectory_coordinates which publish setpoints to type the digits of the code(1700810)..
+                            -Its algorithm just deals with line(vertical and horizontal) whose equations are x = x_initial + alpha * time & y = y_initial + alpha * time..
+                            -Trajectory planning for simulation to test.
+                            -Closed loop control as it publishes the corrective actions to eliminate error (error_x = x_desired - x_actual and error_y = y_desired - y_actual) to the inverse
+                             kinematics topic then servos and gets the feedback actual joints position by topics: /feedback_x and /feedback_y..
+                            -Feedback angles come from forward_kinematics script.
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+import rospy
+from geometry_msgs.msg import Point
+from std_msgs.msg import Float64
+from rosgraph_msgs.msg import Clock
+import time
+
+rospy.init_node('trajectory_execution')
+
+rate = rospy.Rate(1) # 1 Hz = 1 sec .Causing the discretization with sampling time = 1 sec..
+
+
+alpha_desired = 0.5  # step coefficient which controls the duration of code typing..
+
+def feed_x_callback(msg):
+  global x_now
+  x_now = msg.data
+
+
+
+def feed_y_callback(msg):
+  global y_actual
+  y_actual = msg.data
+
+
+
+def control_algorithm_1(x_desired,y_desired,direction):
+ integral = 0
+ time_now_2 = 0
+ kp = 1.5
+ ki = 0.5
+ while True:
+   previous_time = time_now_2 
+   rate.sleep()
+   time_now_2 = time_now_2 + 0.5
+   delta_t = time_now_2 - previous_time
+   error_x = x_desired - x_now
+   error_y = y_desired - y_actual
+   integral = integral + error_x * delta_t
+   pub_point = Point()
+   pub_point.x = x_now + kp * error_x + ki * integral
+   pub_point.y = y_actual + kp * error_y
+   pub.publish(pub_point) 
+   if (direction == False):
+      if (x_now)<=x_desired+0.1  and (y_actual>=(y_desired-0.5) and y_actual<=(y_desired+0.5)):
+          break
+   if (direction == True):
+      if (x_now)>=x_desired-0.1  and (y_actual>=(y_desired-0.5) and y_actual<=(y_desired+0.5)):
+          break
+
+def control_algorithm_2(x_desired,y_desired,direction):
+ kp = 1.2
+ ki = 0.3
+ integral = 0
+ time_now_2 = 0
+ while True:
+   previous_time = time_now_2 
+   rate.sleep()
+   time_now_2 = time_now_2 + 0.5
+   delta_t = time_now_2 - previous_time
+   error_x = x_desired - x_now
+   error_y = y_desired - y_actual
+   integral = integral + error_y * delta_t
+   pub_point = Point()
+   pub_point.x = x_now + kp * error_x
+   pub_point.y = y_actual + kp * error_y + ki * integral
+   pub.publish(pub_point) 
+   if (direction == False):
+      if (y_actual)<=y_desired+0.1  and (x_now>=(x_desired-0.5) and x_now<=(x_desired+0.5)):
+          break
+   if (direction == True):
+      if (y_actual)>=y_desired-0.1  and (x_now>=(x_desired-0.5) and x_now<=(x_desired+0.5)):
+          break
+
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"""Description:- * Creating a trajectory in x-axix of global frame: base_link"""
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+def execute_path_x(start_x,alpha,setpoint,y_desired_val):
+ time = 0
+ time_now = 0
+ direction = True
+ while True:
+   rate.sleep()
+   # current_time it's like a timer which we use for the equation of x_desired...
+   # Its increment by 1 sec as we selected our rate 1 Hz for discretization..
+   current_time = time_now - time 
+   x_desired = start_x + alpha * current_time
+   time_now = time_now + 1
+   y_desired = y_desired_val
+   # pub_point is a message that its type is Point for the publishment...
+   pub_point = Point()
+   pub_point.x = x_desired 
+   pub_point.y = y_desired_val
+   pub.publish(pub_point)
+   if (x_now != x_desired):
+     if (alpha < 0):
+       control_algorithm_1(x_desired,y_desired,False)  
+     else:
+       control_algorithm_1(x_desired,y_desired,True)
+   # The publishment stops when the robot arm completes the line in x_direction.
+   # x_desired(setpoint) > or < setpoint according to alpha's sign..
+   if (alpha < 0):
+     if (x_now <= (setpoint)):
+       break
+   if (alpha > 0):
+     if (x_now >= (setpoint)):
+       break
+
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"""Description:- * Creating a trajectory in y-axix of global frame: base_link"""
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+def execute_path_y(start_y,alpha,setpoint,x_desired_val):
+  time_1 = 0
+  time_now_1 = 0
+  direction = True
+  while True:
+    rate.sleep()
+    current_time_1 = time_now_1 - time_1
+    y_desired_1 = start_y + alpha * current_time_1
+    time_now_1 = time_now_1 + 1
+    x_desired_1 = x_desired_val
+    pub_point = Point()
+    pub_point.x = x_desired_1
+    pub_point.y = y_desired_1
+    pub.publish(pub_point)
+    if (y_actual != y_desired_1):
+     if (alpha < 0):
+       control_algorithm_2(x_desired_1,y_desired_1,False)  
+     else:
+       control_algorithm_2(x_desired_1,y_desired_1,True)
+
+    if (alpha > 0):
+      if (y_actual >= (setpoint)):
+        break
+    if (alpha < 0):
+      if (y_actual <= (setpoint)):
+        break
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+Description:- * Main functions to draw the digits of the code(1700810)..
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+def one_draw(x,y):
+    execute_path_x(x,-alpha_desired,(x - 2),y) 
+    execute_path_x((x - 2),alpha_desired,x,y)
+    execute_path_y(y,-alpha_desired,(y-1),x) 
+    seven_draw(x,y-1)
+
+def seven_draw(x,y):
+    execute_path_y(y,alpha_desired,(y - 0.5),(x))
+    execute_path_x(x,-alpha_desired,(x - 2),(y - 0.5)) 
+    execute_path_x((x - 2),alpha_desired,(x),(y - 0.5))
+    execute_path_y((y - 0.5),alpha_desired,(y-2),x)
+    zero_draw_1(x,(y-2))
+
+def zero_draw_1(x,y):
+    execute_path_x(x,-alpha_desired,(x - 1),y) 
+    execute_path_y(y,-alpha_desired,(y - 1),(x - 1)) 
+    execute_path_x((x - 1),alpha_desired, (x),(y - 1))
+    execute_path_y((y - 1),alpha_desired,(y),(x))
+    execute_path_y((y),-alpha_desired,(y - 2),(x)) 
+    zero_draw_2(x,y - 2)
+
+def zero_draw_2(x,y):
+    execute_path_x(x,-alpha_desired,(x - 1),y) 
+    execute_path_y(y,-alpha_desired,(y - 1),(x - 1)) 
+    execute_path_x((x - 1),alpha_desired, (x),(y - 1))
+    execute_path_y((y - 1),alpha_desired,(y),(x))
+    execute_path_y((y),-alpha_desired,(y - 8),(x))
+    eight_draw(x,(y - 8))
+
+def eight_draw(x,y):
+   execute_path_x(x,-alpha_desired,(x - 1),y) 
+   execute_path_y(y,-alpha_desired,(y - 1),(x - 1)) 
+   execute_path_x((x - 1),alpha_desired, (x),(y - 1))
+   execute_path_y((y - 1),alpha_desired,(y),(x))
+   execute_path_x(x,-alpha_desired,(x - 1.5),y) 
+   execute_path_y(y,-alpha_desired,(y - 1),(x - 1.5)) 
+   execute_path_x((x - 1.5),alpha_desired, (x),(y - 1))
+   execute_path_y(((y - 1)),-alpha_desired,(y - 2),(x)) 
+   one_draw_1(x,(y - 2))
+
+def one_draw_1(x,y):
+    execute_path_x(x,-alpha_desired,(x - 1.5),y) 
+    execute_path_x((x - 1.5),alpha_desired,x,y)
+    execute_path_y(y,-alpha_desired,(y-1),x) 
+    zero_draw_3(x,y-1)
+
+
+def zero_draw_3(x,y):
+    execute_path_x(x,-alpha_desired,(x - 1),y) 
+    execute_path_y(y,-alpha_desired,(y - 1),(x - 1)) 
+    execute_path_x((x - 1),alpha_desired, (x),(y - 1))
+    execute_path_y((y - 1.5),alpha_desired,(y),(x))
+    execute_path_y((y),-alpha_desired,(y - 1),(x))
+
+
+def code_1700810(x,y):
+    one_draw(x,y)
+
+
+
+pub = rospy.Publisher('/trajectory_coordinates', Point, queue_size=10)
+rospy.Subscriber("/feedback_x", Float64 , feed_x_callback)
+rospy.Subscriber("/feedback_y", Float64 , feed_y_callback)
+
+rospy.wait_for_message("/feedback_x",Float64)
+rospy.wait_for_message("/feedback_y",Float64)
+
+while not rospy.is_shutdown():
+ code_1700810(10,9)
+ rospy.spin()
