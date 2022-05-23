@@ -1,0 +1,35 @@
+<launch>
+  <param name="/use_sim_time" value="false" />
+  <include
+    file="$(find gazebo_ros)/launch/empty_world.launch" />
+  <param name="robot_description" textfile="$(find rrr_urdf)/urdf/rrr_urdf.urdf" />
+  <param name="use_gui" value="true"/>
+  <!--node
+    name="tf_footprint_base"
+    pkg="tf"
+    type="static_transform_publisher"
+    args="0 0 0 0 0 0 base_link base_footprint 40" /-->
+  <node name="spawn_vehicle" pkg="gazebo_ros" type="spawn_model"
+          args="-urdf -param robot_description -model rrr_urdf
+                -gazebo_namespace ///gazebo
+                -x 0 -y 0 -z 0
+                -R 0 -P 0 -Y 0"/>
+  <!--node
+    name="fake_joint_calibration"
+    pkg="rostopic"
+    type="rostopic"
+    args="pub /calibrated std_msgs/Bool true" /-->
+
+  <node name="vehicle_state_publisher" pkg="robot_state_publisher"
+          type="robot_state_publisher">
+      <param name="publish_frequency" value="30.0"/>
+  </node>
+
+  <node name="controller_spawner" pkg="controller_manager" type="spawner"
+          args="$(find rrr_urdf)/config/controllers.yaml"/>
+  <!--node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" >
+  </node-->
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find rrr_urdf)/r_config.rviz"/>
+  
+</launch>

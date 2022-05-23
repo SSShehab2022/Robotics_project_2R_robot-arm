@@ -1,0 +1,15 @@
+<launch>
+
+
+ <node pkg="rosserial_python" type="serial_node.py" name="rosserial_lipo" output="screen">
+  <param name="~port" value="/dev/ttyACM0" />
+  </node>
+ <node name="feedback_forward_kinematics" pkg="rrr_urdf"
+          type="forward_kinematics.py"/> 
+ <node name="inverse_kinematics_execution" pkg="rrr_urdf"
+          type="inverse_kinematics.py"/>
+ <node name="trajectory_execution" pkg="rrr_urdf"
+          type="trajectory_planning.py"/>
+ 
+
+</launch>

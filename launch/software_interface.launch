@@ -1,0 +1,13 @@
+<launch>
+
+ <node name="feedback_forward_kinematics" pkg="rrr_urdf"
+          type="forward_kinematics.py"/> 
+ <node name="inverse_kinematics_execution" pkg="rrr_urdf"
+          type="inverse_kinematics.py"/>
+ <node name="trajectory_execution" pkg="rrr_urdf"
+          type="traj_software"/>
+ 
+
+
+
+</launch>
